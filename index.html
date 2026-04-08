@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>魔性功德点击器</title>
+    <style>
+        /* 基础样式重置 */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f8f8f8;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            overflow: hidden; /* 防止文字上飘时页面滚动 */
+        }
+
+        /* 右上角总分数 */
+        .total-score {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            background-color: #e5e5ea;
+            color: #8e8e93;
+            font-size: 18px;
+            font-weight: 600;
+            padding: 6px 16px;
+            border-radius: 20px;
+            z-index: 10;
+        }
+
+        /* 主舞台（显示大图和飘字特效） */
+        .main-stage {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* 主角色图片 */
+        #main-character {
+            width: 220px;
+            cursor: pointer;
+            transition: transform 0.05s ease-in-out;
+            z-index: 2;
+        }
+        #main-character:active {
+            transform: scale(0.85);
+        }
+
+        /* 飘字特效容器 */
+        .floating-text {
+            position: absolute;
+            top: 35%; /* 默认出现在主图偏上的位置 */
+            text-align: center;
+            pointer-events: none; /* 防止挡住图片的点击 */
+            z-index: 3;
+            animation: floatUpAndFade 1s ease-out forwards;
+        }
+        .float-gongde {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .float-name {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* 飘字动画关键帧 */
+        @keyframes floatUpAndFade {
+            0% { opacity: 1; transform: translateY(0) scale(0.8); }
+            20% { transform: translateY(-20px) scale(1.1); }
+            100% { opacity: 0; transform: translateY(-80px) scale(1); }
+        }
+
+        /* 底部选择坞 */
+        .bottom-dock {
+            background-color: #f0f0f5;
+            margin: 0 20px 40px 20px;
+            padding: 15px;
+            border-radius: 24px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        /* 选择坞里面的小缩略图 */
+        .thumbnail {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 3px solid transparent;
+        }
+        .thumbnail img {
+            width: 80%;
+            height: 80%;
+            object-fit: contain;
+        }
+        
+        /* 选中的缩略图样式 */
+        .thumbnail.active {
+            border-color: #000;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="total-score" id="total-score">0</div>
+
+    <div class="main-stage" id="main-stage">
+        <img id="main-character" src="" alt="点击我">
+    </div>
+
+    <div class="bottom-dock" id="bottom-dock">
+        </div>
+
+    <audio id="click-sound" src=""></audio>
+
+    <script>
+        // ==========================================
+        // 1. 在这里配置你的素材（务必换成你自己的文件名）
+        // ==========================================
+        const characters = [
+            { id: 'bibi', name: '比比拉布', img: '比.png', audio: '比.mp3' },
+            { id: 'daodun', name: '我的刀盾', img: '刀.png', audio: '刀.mp3' },
+            { id: 'baga', name: '八嘎压路', img: '八.png', audio: '八.mp3' }
+        ];
+
+        // ==========================================
+        // 2. 核心逻辑代码 (不需要修改)
+        // ==========================================
+        let totalScore = 0;
+        let currentIndex = 0; // 默认选中数组里的第一个
+
+        const scoreDisplay = document.getElementById('total-score');
+        const mainImg = document.getElementById('main-character');
+        const clickSound = document.getElementById('click-sound');
+        const dockContainer = document.getElementById('bottom-dock');
+        const mainStage = document.getElementById('main-stage');
+
+        // 初始化页面
+        function initApp() {
+            renderDock();
+            updateMainCharacter();
+        }
+
+        // 渲染底部的缩略图
+        function renderDock() {
+            dockContainer.innerHTML = ''; // 清空内容
+            characters.forEach((char, index) => {
+                const thumbDiv = document.createElement('div');
+                // 如果是当前选中的，加上 active 类名
+                thumbDiv.className = index === currentIndex ? 'thumbnail active' : 'thumbnail';
+                
+                const imgTag = document.createElement('img');
+                imgTag.src = char.img;
+                
+                thumbDiv.appendChild(imgTag);
+                
+                // 点击缩略图切换角色
+                thumbDiv.addEventListener('click', () => {
+                    currentIndex = index;
+                    renderDock(); // 重新渲染底栏以更新黑框状态
+                    updateMainCharacter(); // 更新主图和声音
+                });
+
+                dockContainer.appendChild(thumbDiv);
+            });
+        }
+
+        // 更新主界面的角色和音频
+        function updateMainCharacter() {
+            const currentChar = characters[currentIndex];
+            mainImg.src = currentChar.img;
+            clickSound.src = currentChar.audio;
+        }
+
+        // 创建飘字动画特效
+        function createFloatingText() {
+            const currentChar = characters[currentIndex];
+            
+            // 创建容器
+            const floatContainer = document.createElement('div');
+            floatContainer.className = 'floating-text';
+            
+            // 创建功德+1文字
+            const gongdeText = document.createElement('div');
+            gongdeText.className = 'float-gongde';
+            gongdeText.innerText = '功德+1';
+            
+            // 创建角色名文字
+            const nameText = document.createElement('div');
+            nameText.className = 'float-name';
+            nameText.innerText = currentChar.name;
+            
+            // 组装并添加到页面
+            floatContainer.appendChild(gongdeText);
+            floatContainer.appendChild(nameText);
+            mainStage.appendChild(floatContainer);
+            
+            // 动画结束后（1秒后）将这个元素从页面删除，防止越积越多导致卡顿
+            setTimeout(() => {
+                floatContainer.remove();
+            }, 1000);
+        }
+
+        // 主图片点击/触摸事件 (使用 pointerdown 兼容鼠标和手机触摸)
+        mainImg.addEventListener('pointerdown', function(e) {
+            e.preventDefault(); 
+            
+            // 1. 增加总分
+            totalScore++;
+            scoreDisplay.innerText = totalScore;
+            
+            // 2. 播放声音
+            clickSound.currentTime = 0; 
+            clickSound.play().catch(e => console.log("等待用户交互后播放音频"));
+
+            // 3. 触发飘字特效
+            createFloatingText();
+            
+            // 4. 手机端手动触发一点缩放效果
+            mainImg.style.transform = 'scale(0.85)';
+            setTimeout(() => {
+                mainImg.style.transform = 'scale(1)';
+            }, 100);
+        });
+
+        // 启动程序
+        initApp();
+    </script>
+</body>
+</html>
